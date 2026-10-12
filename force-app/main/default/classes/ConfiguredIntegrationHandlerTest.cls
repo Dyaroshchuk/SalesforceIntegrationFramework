@@ -85,6 +85,59 @@ private class ConfiguredIntegrationHandlerTest {
     ((IntegrationHttpClient) mocks.verify(client, 0)).send(anyRequest());
   }
 
+  @IsTest
+  static void logsCalloutsButNeverTokenPayloads() {
+    Integration_Configuration__mdt record = record();
+    record.Logging_Enabled__c = true;
+    record.Log_Payloads__c = true;
+    setUp(record);
+    mocks.startStubbing();
+    mocks.when(client.send(anyRequest()))
+      .thenReturn(response(200))
+      .thenReturn(response(201));
+    mocks.stopStubbing();
+
+    new TokenHandler(client)
+      .execute(
+        new BaseIntegrationHandler.IntegrationRequest('POST', 'invoices')
+          .setBody('{"amount":100}')
+      );
+    Test.getEventBus().deliver();
+
+    List<Log__c> logs = [
+      SELECT Category__c, Integration_Name__c, Endpoint__c, Status_Code__c, Request_Body__c
+      FROM Log__c
+      WITH SYSTEM_MODE
+      ORDER BY Name
+    ];
+    Assert.areEqual(2, logs.size());
+    Assert.areEqual('callout:Billing_API/oauth/token', logs[0].Endpoint__c);
+    Assert.isNull(logs[0].Request_Body__c, 'Token credentials must not be logged');
+    Assert.areEqual('callout:Billing_API/invoices', logs[1].Endpoint__c);
+    Assert.areEqual('{"amount":100}', logs[1].Request_Body__c);
+    Assert.areEqual(201, logs[1].Status_Code__c);
+    for (Log__c log : logs) {
+      Assert.areEqual('Integration', log.Category__c);
+      Assert.areEqual(INTEGRATION_NAME, log.Integration_Name__c);
+    }
+  }
+
+  @IsTest
+  static void doesNotLogWhenLoggingIsDisabled() {
+    Integration_Configuration__mdt record = record();
+    record.Logging_Enabled__c = false;
+    setUp(record);
+    mocks.startStubbing();
+    mocks.when(client.send(anyRequest())).thenReturn(response(200));
+    mocks.stopStubbing();
+
+    new TestHandler(client)
+      .execute(new BaseIntegrationHandler.IntegrationRequest('GET', 'invoices'));
+    Test.getEventBus().deliver();
+
+    Assert.areEqual(0, [SELECT COUNT() FROM Log__c WITH SYSTEM_MODE]);
+  }
+
   private static Integration_Configuration__mdt record() {
     return new Integration_Configuration__mdt(
       DeveloperName = INTEGRATION_NAME,
@@ -144,6 +197,26 @@ private class ConfiguredIntegrationHandlerTest {
 
     public Integer defaultRetryAfterSeconds() {
       return getDefaultRetryAfterSeconds();
+    }
+  }
+
+  /** Fetches a token through send() with credentials in the body. */
+  private class TokenHandler extends ConfiguredIntegrationHandler {
+    public TokenHandler(IntegrationHttpClient httpClient) {
+      setHttpClient(httpClient);
+    }
+
+    protected override String getIntegrationName() {
+      return INTEGRATION_NAME;
+    }
+
+    protected override BaseIntegrationHandler.AccessToken requestAccessToken() {
+      HttpRequest tokenRequest = new HttpRequest();
+      tokenRequest.setMethod('POST');
+      tokenRequest.setEndpoint(getBaseEndpoint() + '/oauth/token');
+      tokenRequest.setBody('client_secret=s3cret');
+      send(tokenRequest);
+      return new BaseIntegrationHandler.AccessToken('token', null, 3600);
     }
   }
 }

@@ -36,6 +36,7 @@ public abstract inherited sharing class BaseIntegrationHandler {
   private static Long totalCalloutMs = 0;
 
   private IntegrationHttpClient httpClient = new NativeHttpClient();
+  private Boolean requestingAccessToken = false;
 
   /** Replaces the transport, e.g. with an fflib_ApexMocks mock in unit tests. */
   public void setHttpClient(IntegrationHttpClient httpClient) {
@@ -125,8 +126,9 @@ public abstract inherited sharing class BaseIntegrationHandler {
   // ---------------------------------------------------------------------------
 
   /**
-   * Called after every callout attempt, including token requests. httpResponse is null and
-   * error is set when no response was received. Must not perform DML.
+   * Called after every callout attempt, including token requests (see
+   * isRequestingAccessToken()). httpResponse is null and error is set when no response was
+   * received. Must not perform DML; publishing Publish Immediately events (Logger) is fine.
    */
   protected virtual void onCalloutComplete(
     HttpRequest httpRequest,
@@ -134,6 +136,11 @@ public abstract inherited sharing class BaseIntegrationHandler {
     Exception error,
     Long durationMs
   ) {
+  }
+
+  /** True while requestAccessToken() runs, e.g. to keep credentials out of logs. */
+  protected Boolean isRequestingAccessToken() {
+    return requestingAccessToken;
   }
 
   // ---------------------------------------------------------------------------
@@ -323,7 +330,12 @@ public abstract inherited sharing class BaseIntegrationHandler {
   private AccessToken getAccessToken() {
     AccessToken token = getCachedAccessToken();
     if (token == null || token.isExpired()) {
-      token = requestAccessToken();
+      requestingAccessToken = true;
+      try {
+        token = requestAccessToken();
+      } finally {
+        requestingAccessToken = false;
+      }
       if (token != null) {
         if (String.isBlank(token.value)) {
           throw new AuthenticationException(

@@ -41,6 +41,28 @@ private class AsyncCalloutExecutorTest {
     );
     Assert.areEqual(1, failures.size());
     Assert.areEqual(error, failures[0]);
+
+    Test.getEventBus().deliver();
+    List<Log__c> logs = [
+      SELECT Category__c, Level__c, Message__c
+      FROM Log__c
+      WITH SYSTEM_MODE
+      ORDER BY Name
+    ];
+    Assert.areEqual(4, logs.size());
+    for (Integer i = 0; i < 3; i++) {
+      Assert.areEqual('WARN', logs[i].Level__c);
+      Assert.isTrue(
+        logs[i].Message__c.contains('retrying in'),
+        logs[i].Message__c
+      );
+    }
+    Assert.areEqual('ERROR', logs[3].Level__c);
+    Assert.areEqual(
+      'Async callout failed after 4 attempt(s): Read timed out',
+      logs[3].Message__c
+    );
+    Assert.areEqual('Integration', logs[3].Category__c);
   }
 
   @IsTest

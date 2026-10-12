@@ -3,7 +3,8 @@
  *
  * Subclasses only implement getIntegrationName(), which must match the record's DeveloperName.
  * The endpoint comes from the record's Named Credential and the callout policy from its fields;
- * blank fields fall back to the BaseIntegrationHandler defaults. Configuration is loaded on first
+ * blank fields fall back to the BaseIntegrationHandler defaults. Callouts are logged through
+ * IntegrationLogger according to Logging_Enabled__c and Log_Payloads__c. Configuration is loaded on first
  * use, so a missing, inactive or invalid record surfaces as a ConfigurationException from execute().
  */
 public abstract inherited sharing class ConfiguredIntegrationHandler extends BaseIntegrationHandler {
@@ -40,6 +41,29 @@ public abstract inherited sharing class ConfiguredIntegrationHandler extends Bas
 
   protected virtual override Set<Integer> getRetryableStatusCodes() {
     return getConfig().retryableStatusCodes ?? super.getRetryableStatusCodes();
+  }
+
+  /**
+   * Logs every callout attempt when Logging_Enabled__c is set. Bodies are included only with
+   * Log_Payloads__c, and never for token requests. Overrides should call super.
+   */
+  protected virtual override void onCalloutComplete(
+    HttpRequest httpRequest,
+    HttpResponse httpResponse,
+    Exception error,
+    Long durationMs
+  ) {
+    IntegrationConfigLoader.IntegrationConfig config = getConfig();
+    if (config.loggingEnabled == true) {
+      IntegrationLogger.logCallout(
+        getIntegrationName(),
+        httpRequest,
+        httpResponse,
+        error,
+        durationMs,
+        config.logPayloads == true && !isRequestingAccessToken()
+      );
+    }
   }
 
   /** Framework defaults overlaid with the configured headers. */

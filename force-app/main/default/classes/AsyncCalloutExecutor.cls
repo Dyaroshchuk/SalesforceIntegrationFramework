@@ -5,7 +5,8 @@
  * again. If so it re-enqueues itself after the backoff delay; for a rate limit, after the
  * Retry-After time if that is longer. Delays are rounded up to whole minutes and capped at the
  * platform maximum of 10. A failure that is not retryable, or that remains after the last retry,
- * is passed to ICalloutQueueable.onFailure().
+ * is passed to ICalloutQueueable.onFailure(). Scheduled retries and final failures are logged
+ * as Integration logs.
  *
  * Usage: AsyncCalloutExecutor.enqueue(new SyncInvoiceCallout(invoiceId));
  */
@@ -61,6 +62,11 @@ public inherited sharing class AsyncCalloutExecutor implements Queueable, Databa
       callout.execute();
     } catch (Exception e) {
       if (!retryLater(e)) {
+        IntegrationLogger.logFailure(
+          null,
+          'Async callout failed after ' + attempts + ' attempt(s)',
+          e
+        );
         callout.onFailure(e);
       }
     }
@@ -87,6 +93,18 @@ public inherited sharing class AsyncCalloutExecutor implements Queueable, Databa
       delayMs = Math.max(delayMs, (retryAfterSeconds ?? 0) * 1000L);
     }
     Integer delayMinutes = toDelayMinutes(delayMs);
+    IntegrationLogger.logWarning(
+      null,
+      'Async callout attempt ' +
+        attempts +
+        ' failed (' +
+        error.getTypeName() +
+        ': ' +
+        error.getMessage() +
+        '); retrying in ' +
+        delayMinutes +
+        ' minute(s)'
+    );
     if (retryDelaysMinutes != null) {
       retryDelaysMinutes.add(delayMinutes);
     } else {

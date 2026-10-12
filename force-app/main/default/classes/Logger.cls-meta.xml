@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ApexClass xmlns="http://soap.sforce.com/2006/04/metadata">
+    <!-- Pinned below 67.0: from API 67 EventBus.publish enforces the running user's Create permission on Log_Event__e, and publish has no system-mode option. A logger must work for every user. See Logger.cls header. -->
+    <apiVersion>66.0</apiVersion>
+    <status>Active</status>
+</ApexClass>
