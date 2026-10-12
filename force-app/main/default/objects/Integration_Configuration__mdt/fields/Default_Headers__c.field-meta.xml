@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Default_Headers__c</fullName>
+    <description>JSON object of headers sent with every request, e.g. {&quot;Stripe-Version&quot;: &quot;2024-06-20&quot;}. Must not contain Authorization or other secrets; those belong in the Named Credential.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>JSON object of headers sent with every request, e.g. {&quot;Stripe-Version&quot;: &quot;2024-06-20&quot;}. Must not contain Authorization or other secrets; those belong in the Named Credential.</inlineHelpText>
+    <label>Default Headers</label>
+    <length>32768</length>
+    <type>LongTextArea</type>
+    <visibleLines>5</visibleLines>
+</CustomField>

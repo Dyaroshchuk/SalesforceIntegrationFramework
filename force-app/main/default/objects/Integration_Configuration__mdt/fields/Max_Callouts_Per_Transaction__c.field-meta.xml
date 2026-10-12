@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Max_Callouts_Per_Transaction__c</fullName>
+    <description>Cap on callouts this integration may make in one transaction. Blank means no cap beyond the governor limit.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Cap on callouts this integration may make in one transaction. Blank means no cap beyond the governor limit.</inlineHelpText>
+    <label>Max Callouts Per Transaction</label>
+    <precision>3</precision>
+    <required>false</required>
+    <scale>0</scale>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

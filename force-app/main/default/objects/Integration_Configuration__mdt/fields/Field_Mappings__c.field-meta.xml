@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Field_Mappings__c</fullName>
+    <description>JSON object mapping Salesforce field API names to external field names, e.g. {&quot;Email&quot;: &quot;email&quot;, &quot;Company&quot;: &quot;company&quot;}.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>JSON object mapping Salesforce field API names to external field names, e.g. {&quot;Email&quot;: &quot;email&quot;, &quot;Company&quot;: &quot;company&quot;}.</inlineHelpText>
+    <label>Field Mappings</label>
+    <length>32768</length>
+    <type>LongTextArea</type>
+    <visibleLines>5</visibleLines>
+</CustomField>

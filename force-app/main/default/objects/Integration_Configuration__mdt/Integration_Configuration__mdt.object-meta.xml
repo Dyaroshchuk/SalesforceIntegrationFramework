@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Per-integration configuration read by IntegrationConfigLoader. The record's DeveloperName is the integration name. Authentication and the endpoint host live in the referenced Named Credential; this record holds behaviour only (callout policy, headers, field mappings, flags) and must never contain secrets.</description>
+    <label>Integration Configuration</label>
+    <pluralLabel>Integration Configurations</pluralLabel>
+    <visibility>Public</visibility>
+</CustomObject>

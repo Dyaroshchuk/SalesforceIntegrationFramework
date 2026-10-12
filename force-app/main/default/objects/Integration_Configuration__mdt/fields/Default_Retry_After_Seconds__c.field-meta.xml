@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Default_Retry_After_Seconds__c</fullName>
+    <description>Wait applied after HTTP 429 when the response has no usable Retry-After header. Blank uses the framework default (60).</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Wait applied after HTTP 429 when the response has no usable Retry-After header. Blank uses the framework default (60).</inlineHelpText>
+    <label>Default Retry-After (Seconds)</label>
+    <precision>5</precision>
+    <required>false</required>
+    <scale>0</scale>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

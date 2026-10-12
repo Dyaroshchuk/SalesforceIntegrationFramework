@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Max_Retries__c</fullName>
+    <description>Retries after the first attempt for transient failures. Blank uses the framework default (2); 0 disables retries.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Retries after the first attempt for transient failures. Blank uses the framework default (2); 0 disables retries.</inlineHelpText>
+    <label>Max Retries</label>
+    <precision>2</precision>
+    <required>false</required>
+    <scale>0</scale>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Is_Active__c</fullName>
+    <defaultValue>true</defaultValue>
+    <description>Inactive configurations cannot be loaded, which stops every callout for the integration.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Inactive configurations cannot be loaded, which stops every callout for the integration.</inlineHelpText>
+    <label>Active</label>
+    <type>Checkbox</type>
+</CustomField>

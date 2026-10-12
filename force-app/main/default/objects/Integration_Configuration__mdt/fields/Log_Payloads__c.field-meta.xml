@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Log_Payloads__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Include request and response bodies in the integration log. Leave off for integrations that carry personal or payment data.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Include request and response bodies in the integration log. Leave off for integrations that carry personal or payment data.</inlineHelpText>
+    <label>Log Payloads</label>
+    <type>Checkbox</type>
+</CustomField>
