@@ -21,38 +21,22 @@ private class AsyncCalloutExecutorTest {
   }
 
   @IsTest
-  static void reEnqueuesWithDelayWhenRateLimited() {
+  static void retriesTransientFailuresWithBackoffThenReportsFailure() {
+    CalloutException error = new CalloutException('Read timed out');
     AsyncCalloutExecutor executor = new AsyncCalloutExecutor(
-      new FakeCallout(rateLimit(90))
+      new FakeCallout(error)
     );
 
-    executor.execute(null);
+    // In production each retry is a new Queueable run; here the runs are made directly.
+    for (Integer i = 0; i < 4; i++) {
+      executor.execute(null);
+    }
 
-    Assert.areEqual(1, executions);
-    Assert.areEqual(1, executor.getAttempts());
-    // Retry-After of 90 seconds rounds up to a 2 minute delay.
+    Assert.areEqual(4, executions);
+    Assert.areEqual(4, executor.getAttempts());
+    // Default policy: 3 retries after 1, 2 and 4 minutes, then the failure is reported.
     Assert.areEqual(
-      new List<Integer>{ 2 },
-      AsyncCalloutExecutor.retryDelaysMinutes
-    );
-    Assert.isTrue(failures.isEmpty());
-  }
-
-  @IsTest
-  static void reportsRateLimitOnLastAttempt() {
-    BaseIntegrationHandler.RateLimitException error = rateLimit(30);
-    AsyncCalloutExecutor executor = new AsyncCalloutExecutor(
-      new FakeCallout(error),
-      2
-    );
-
-    executor.execute(null);
-    executor.execute(null);
-
-    Assert.areEqual(2, executions);
-    // Only the first run re-enqueued; the second reached maxAttempts.
-    Assert.areEqual(
-      new List<Integer>{ 1 },
+      new List<Integer>{ 1, 2, 4 },
       AsyncCalloutExecutor.retryDelaysMinutes
     );
     Assert.areEqual(1, failures.size());
@@ -60,9 +44,40 @@ private class AsyncCalloutExecutorTest {
   }
 
   @IsTest
-  static void reportsOtherExceptionsWithoutRetrying() {
+  static void rateLimitWaitsForLongerOfRetryAfterAndBackoff() {
+    new AsyncCalloutExecutor(new FakeCallout(rateLimit(150))).execute(null);
+    new AsyncCalloutExecutor(new FakeCallout(rateLimit(30))).execute(null);
+    new AsyncCalloutExecutor(new FakeCallout(rateLimit(null))).execute(null);
+
+    // 150 s beats the 1 minute backoff (rounded up to 3 minutes); 30 s and none do not.
+    Assert.areEqual(
+      new List<Integer>{ 3, 1, 1 },
+      AsyncCalloutExecutor.retryDelaysMinutes
+    );
+    Assert.isTrue(failures.isEmpty());
+  }
+
+  @IsTest
+  static void usesCustomRetryPolicy() {
+    AsyncCalloutExecutor executor = new AsyncCalloutExecutor(
+      new FakeCallout(rateLimit(0)),
+      new ExponentialBackoffRetry(120000, 3, 1)
+    );
+
+    executor.execute(null);
+    executor.execute(null);
+
+    Assert.areEqual(
+      new List<Integer>{ 2 },
+      AsyncCalloutExecutor.retryDelaysMinutes
+    );
+    Assert.areEqual(1, failures.size());
+  }
+
+  @IsTest
+  static void reportsNonRetryableFailureWithoutRetrying() {
     BaseIntegrationHandler.IntegrationException error = new BaseIntegrationHandler.IntegrationException(
-      'Billing callout failed'
+      'Request is required'
     );
 
     new AsyncCalloutExecutor(new FakeCallout(error)).execute(null);
@@ -78,11 +93,11 @@ private class AsyncCalloutExecutorTest {
     Assert.areEqual(0, AsyncCalloutExecutor.toDelayMinutes(null));
     Assert.areEqual(0, AsyncCalloutExecutor.toDelayMinutes(0));
     Assert.areEqual(1, AsyncCalloutExecutor.toDelayMinutes(1));
-    Assert.areEqual(1, AsyncCalloutExecutor.toDelayMinutes(60));
-    Assert.areEqual(2, AsyncCalloutExecutor.toDelayMinutes(61));
+    Assert.areEqual(1, AsyncCalloutExecutor.toDelayMinutes(60000));
+    Assert.areEqual(2, AsyncCalloutExecutor.toDelayMinutes(60001));
     Assert.areEqual(
       AsyncCalloutExecutor.MAX_DELAY_MINUTES,
-      AsyncCalloutExecutor.toDelayMinutes(3600)
+      AsyncCalloutExecutor.toDelayMinutes(3600000)
     );
   }
 
@@ -95,10 +110,10 @@ private class AsyncCalloutExecutorTest {
       Assert.areEqual('Callout is required', e.getMessage());
     }
     try {
-      new AsyncCalloutExecutor(new FakeCallout(null), 0);
+      new AsyncCalloutExecutor(new FakeCallout(null), null);
       Assert.fail('Expected an IntegrationException');
     } catch (BaseIntegrationHandler.IntegrationException e) {
-      Assert.areEqual('Max attempts must be at least 1', e.getMessage());
+      Assert.areEqual('Retry policy is required', e.getMessage());
     }
   }
 

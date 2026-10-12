@@ -8,14 +8,14 @@
 public interface ICalloutQueueable {
   /**
    * Performs the callouts, then any DML (callouts cannot follow uncommitted DML).
-   * A BaseIntegrationHandler.RateLimitException makes the executor run this again later,
+   * A failure the executor's retry policy deems transient makes it run this again later,
    * so a repeated run must be safe.
    */
   void execute();
 
   /**
-   * Called once when the work fails for good: a non-rate-limit exception, or a rate limit
-   * after the last attempt. Runs after all callouts, so DML such as logging is allowed.
+   * Called once when the work fails for good: a failure that is not retryable, or one that
+   * remains after the last retry. Runs after all callouts, so DML such as logging is allowed.
    */
   void onFailure(Exception error);
 }

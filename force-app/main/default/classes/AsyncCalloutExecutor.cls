@@ -1,16 +1,15 @@
 /**
  * Runs an ICalloutQueueable in its own asynchronous transaction with callouts allowed.
  *
- * When the work throws BaseIntegrationHandler.RateLimitException the executor re-enqueues
- * itself, delayed by the exception's retryAfterSeconds (rounded up to whole minutes and capped
- * at the platform maximum of 10), until maxAttempts is reached. Any other exception, or a rate
- * limit on the last attempt, is passed to ICalloutQueueable.onFailure().
+ * When the work throws, the executor asks its ExponentialBackoffRetry policy whether to try
+ * again. If so it re-enqueues itself after the backoff delay; for a rate limit, after the
+ * Retry-After time if that is longer. Delays are rounded up to whole minutes and capped at the
+ * platform maximum of 10. A failure that is not retryable, or that remains after the last retry,
+ * is passed to ICalloutQueueable.onFailure().
  *
  * Usage: AsyncCalloutExecutor.enqueue(new SyncInvoiceCallout(invoiceId));
  */
 public inherited sharing class AsyncCalloutExecutor implements Queueable, Database.AllowsCallouts {
-  @TestVisible
-  private static final Integer DEFAULT_MAX_ATTEMPTS = 3;
   @TestVisible
   private static final Integer MAX_DELAY_MINUTES = 10;
 
@@ -20,29 +19,30 @@ public inherited sharing class AsyncCalloutExecutor implements Queueable, Databa
   private static List<Integer> retryDelaysMinutes;
 
   private final ICalloutQueueable callout;
-  private final Integer maxAttempts;
+  private final ExponentialBackoffRetry retryPolicy;
   private Integer attempts = 0;
 
+  /** Uses the default policy: up to 3 retries after 1, 2 and 4 minutes. */
   public AsyncCalloutExecutor(ICalloutQueueable callout) {
-    this(callout, DEFAULT_MAX_ATTEMPTS);
+    this(callout, new ExponentialBackoffRetry(60000, 2, 3));
   }
 
-  /**
-   * @param maxAttempts Total runs allowed, including the first; must be at least 1.
-   */
-  public AsyncCalloutExecutor(ICalloutQueueable callout, Integer maxAttempts) {
+  public AsyncCalloutExecutor(
+    ICalloutQueueable callout,
+    ExponentialBackoffRetry retryPolicy
+  ) {
     if (callout == null) {
       throw new BaseIntegrationHandler.IntegrationException(
         'Callout is required'
       );
     }
-    if (maxAttempts == null || maxAttempts < 1) {
+    if (retryPolicy == null) {
       throw new BaseIntegrationHandler.IntegrationException(
-        'Max attempts must be at least 1'
+        'Retry policy is required'
       );
     }
     this.callout = callout;
-    this.maxAttempts = maxAttempts;
+    this.retryPolicy = retryPolicy;
   }
 
   /** Enqueues the callout to run as soon as possible and returns the job Id. */
@@ -59,12 +59,10 @@ public inherited sharing class AsyncCalloutExecutor implements Queueable, Databa
     attempts++;
     try {
       callout.execute();
-    } catch (BaseIntegrationHandler.RateLimitException e) {
+    } catch (Exception e) {
       if (!retryLater(e)) {
         callout.onFailure(e);
       }
-    } catch (Exception e) {
-      callout.onFailure(e);
     }
   }
 
@@ -73,14 +71,22 @@ public inherited sharing class AsyncCalloutExecutor implements Queueable, Databa
     return attempts;
   }
 
-  private Boolean retryLater(BaseIntegrationHandler.RateLimitException e) {
+  private Boolean retryLater(Exception error) {
+    Integer retries = attempts - 1;
     if (
-      attempts >= maxAttempts ||
+      !retryPolicy.isRetryable(error) ||
+      !retryPolicy.canRetry(retries) ||
       Limits.getQueueableJobs() >= Limits.getLimitQueueableJobs()
     ) {
       return false;
     }
-    Integer delayMinutes = toDelayMinutes(e.retryAfterSeconds);
+    Long delayMs = retryPolicy.getDelayMs(retries + 1);
+    if (error instanceof BaseIntegrationHandler.RateLimitException) {
+      Integer retryAfterSeconds = ((BaseIntegrationHandler.RateLimitException) error)
+        .retryAfterSeconds;
+      delayMs = Math.max(delayMs, (retryAfterSeconds ?? 0) * 1000L);
+    }
+    Integer delayMinutes = toDelayMinutes(delayMs);
     if (retryDelaysMinutes != null) {
       retryDelaysMinutes.add(delayMinutes);
     } else {
@@ -90,11 +96,11 @@ public inherited sharing class AsyncCalloutExecutor implements Queueable, Databa
   }
 
   @TestVisible
-  private static Integer toDelayMinutes(Integer retryAfterSeconds) {
-    if (retryAfterSeconds == null || retryAfterSeconds <= 0) {
+  private static Integer toDelayMinutes(Long delayMs) {
+    if (delayMs == null || delayMs <= 0) {
       return 0;
     }
-    Integer minutes = (Integer) Math.ceil(retryAfterSeconds / 60.0);
+    Integer minutes = (Integer) Math.ceil(delayMs / 60000.0);
     return Math.min(minutes, MAX_DELAY_MINUTES);
   }
 }
