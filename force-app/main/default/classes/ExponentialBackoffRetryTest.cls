@@ -67,6 +67,9 @@ private class ExponentialBackoffRetryTest {
     Assert.isTrue(
       retry.isRetryable(new BaseIntegrationHandler.CalloutLimitException())
     );
+    Assert.isTrue(
+      retry.isRetryable(new BaseIntegrationHandler.TransientResponseException())
+    );
     Assert.isTrue(retry.isRetryable(new CalloutException('Read timed out')));
     Assert.isTrue(
       retry.isRetryable(

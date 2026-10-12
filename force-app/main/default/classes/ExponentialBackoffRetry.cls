@@ -86,13 +86,15 @@ public virtual inherited sharing class ExponentialBackoffRetry {
   }
 
   /**
-   * Transient failures are retried: rate limits, spent callout budgets and connection errors,
-   * including an IntegrationException caused by one. Everything else (configuration,
-   * authentication, DTO validation, bugs) would fail the same way again.
+   * Transient failures are retried: rate limits, spent callout budgets, retryable HTTP statuses
+   * (see IntegrationResponse.throwIfTransientFailure()) and connection errors, including an
+   * IntegrationException caused by one. Everything else (configuration, authentication, DTO
+   * validation, bugs) would fail the same way again.
    */
   public virtual Boolean isRetryable(Exception error) {
     return error instanceof BaseIntegrationHandler.RateLimitException ||
       error instanceof BaseIntegrationHandler.CalloutLimitException ||
+      error instanceof BaseIntegrationHandler.TransientResponseException ||
       error instanceof CalloutException ||
       error?.getCause() instanceof CalloutException;
   }

@@ -210,7 +210,8 @@ public abstract inherited sharing class BaseIntegrationHandler {
       result = new IntegrationResponse(
         httpResponse,
         attempts,
-        System.currentTimeMillis() - startedAt
+        System.currentTimeMillis() - startedAt,
+        retryable && getRetryableStatusCodes().contains(statusCode)
       );
     }
     return result;
@@ -447,11 +448,25 @@ public abstract inherited sharing class BaseIntegrationHandler {
     public Integer attempts { get; private set; }
     public Long durationMs { get; private set; }
     public HttpResponse httpResponse { get; private set; }
+    private Boolean transientFailure;
 
     public IntegrationResponse(
       HttpResponse httpResponse,
       Integer attempts,
       Long durationMs
+    ) {
+      this(httpResponse, attempts, durationMs, false);
+    }
+
+    /**
+     * @param transientFailure True when the status is one the integration retries, so the
+     *        request may succeed if repeated later.
+     */
+    public IntegrationResponse(
+      HttpResponse httpResponse,
+      Integer attempts,
+      Long durationMs,
+      Boolean transientFailure
     ) {
       this.httpResponse = httpResponse;
       this.statusCode = httpResponse.getStatusCode();
@@ -459,10 +474,35 @@ public abstract inherited sharing class BaseIntegrationHandler {
       this.body = httpResponse.getBody();
       this.attempts = attempts;
       this.durationMs = durationMs;
+      this.transientFailure = transientFailure == true;
     }
 
     public Boolean isSuccess() {
       return statusCode >= 200 && statusCode < 300;
+    }
+
+    /**
+     * True when the request is retryable and the status is one of the integration's retryable
+     * codes (e.g. 503) that persisted through the in-transaction retries.
+     */
+    public Boolean isTransientFailure() {
+      return transientFailure;
+    }
+
+    /**
+     * Throws TransientResponseException for a transient failure so AsyncCalloutExecutor
+     * retries the work later with backoff; returns this response otherwise, e.g.
+     * handler.execute(request).throwIfTransientFailure().
+     */
+    public IntegrationResponse throwIfTransientFailure() {
+      if (transientFailure) {
+        TransientResponseException e = new TransientResponseException(
+          'Transient failure: HTTP ' + statusCode + ' ' + (status ?? '')
+        );
+        e.statusCode = statusCode;
+        throw e;
+      }
+      return this;
     }
 
     public String getHeader(String name) {
@@ -519,5 +559,10 @@ public abstract inherited sharing class BaseIntegrationHandler {
 
   public class RateLimitException extends IntegrationException {
     public Integer retryAfterSeconds { get; set; }
+  }
+
+  /** A retryable HTTP status that persisted through all in-transaction retries. */
+  public class TransientResponseException extends IntegrationException {
+    public Integer statusCode { get; set; }
   }
 }

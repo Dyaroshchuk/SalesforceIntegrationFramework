@@ -90,6 +90,33 @@ private class BaseIntegrationHandlerTest {
     Assert.areEqual(500, result.statusCode);
     Assert.areEqual('still down', result.body);
     Assert.areEqual(3, result.attempts);
+    Assert.isTrue(result.isTransientFailure());
+    try {
+      result.throwIfTransientFailure();
+      Assert.fail('Expected TransientResponseException');
+    } catch (BaseIntegrationHandler.TransientResponseException e) {
+      Assert.areEqual(500, e.statusCode);
+    }
+  }
+
+  @IsTest
+  static void nonRetryableStatusIsNotTransient() {
+    mocks.startStubbing();
+    mocks.when(client.send(anyRequest()))
+      .thenReturn(response(404, ''))
+      .thenReturn(response(200, ''));
+    mocks.stopStubbing();
+    TestHandler handler = new TestHandler(client);
+
+    for (Integer statusCode : new List<Integer>{ 404, 200 }) {
+      BaseIntegrationHandler.IntegrationResponse result = handler.execute(
+        new BaseIntegrationHandler.IntegrationRequest('GET', 'accounts')
+      );
+
+      Assert.areEqual(statusCode, result.statusCode);
+      Assert.isFalse(result.isTransientFailure());
+      Assert.areEqual(result, result.throwIfTransientFailure());
+    }
   }
 
   @IsTest
@@ -121,6 +148,8 @@ private class BaseIntegrationHandlerTest {
       .execute(new BaseIntegrationHandler.IntegrationRequest('POST', 'accounts'));
 
     Assert.areEqual(503, result.statusCode);
+    // Not repeated now, so not repeated later either.
+    Assert.isFalse(result.isTransientFailure());
     sentRequests(1);
   }
 
