@@ -1,8 +1,8 @@
 {
-  "name": "salesforce-app",
+  "name": "salesforce-integration-framework",
   "private": true,
   "version": "1.0.0",
-  "description": "Salesforce App",
+  "description": "Configuration-driven Apex framework for Salesforce integrations",
   "scripts": {
     "lint": "eslint **/{aura,lwc}/**/*.js",
     "test": "npm run test:unit",

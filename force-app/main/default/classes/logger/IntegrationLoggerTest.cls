@@ -47,6 +47,21 @@ private class IntegrationLoggerTest {
   }
 
   @IsTest
+  static void logsQueryStringOnlyWithPayloads() {
+    HttpRequest withQuery = request(null);
+    withQuery.setEndpoint(ENDPOINT + '?email=jane%40example.com');
+
+    IntegrationLogger.logCallout('Billing', withQuery, response(200, 'OK', ''), null, 1, false);
+    IntegrationLogger.logCallout('Billing', withQuery, response(200, 'OK', ''), null, 1, true);
+
+    List<Log__c> logs = deliverAndQuery();
+
+    Assert.areEqual(ENDPOINT, logs[0].Endpoint__c);
+    Assert.areEqual('POST ' + ENDPOINT + ' returned 200 OK', logs[0].Message__c);
+    Assert.areEqual(ENDPOINT + '?email=jane%40example.com', logs[1].Endpoint__c);
+  }
+
+  @IsTest
   static void levelFollowsOutcome() {
     IntegrationLogger.logCallout('Billing', request(null), response(404, 'Not Found', ''), null, 1, false);
     IntegrationLogger.logCallout('Billing', request(null), response(503, 'Service Unavailable', ''), null, 1, false);

@@ -2,8 +2,8 @@
  * Integration entry points to Logger. Entries have Category 'Integration' and the integration's
  * name, so they can be filtered apart from general logs.
  *
- * Request headers are never logged because they may carry credentials; bodies only when asked
- * for, because they may carry personal or payment data.
+ * Request headers are never logged because they may carry credentials; bodies and query strings
+ * only when asked for, because they may carry personal or payment data.
  */
 public without sharing class IntegrationLogger {
   /**
@@ -21,7 +21,10 @@ public without sharing class IntegrationLogger {
   ) {
     Boolean withPayloads = includePayloads == true;
     String method = request?.getMethod();
-    String endpoint = request?.getEndpoint();
+    // Query parameters can carry personal data or keys, so they count as payload.
+    String endpoint = withPayloads
+      ? request?.getEndpoint()
+      : request?.getEndpoint()?.substringBefore('?');
     String message = method + ' ' + endpoint;
     if (response != null) {
       message += ' returned ' + response.getStatusCode();

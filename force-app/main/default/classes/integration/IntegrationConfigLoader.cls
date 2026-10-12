@@ -83,6 +83,13 @@ public inherited sharing class IntegrationConfigLoader {
 
   private static Map<String, Integration_Configuration__mdt> getRecordsByName() {
     if (recordsByName == null) {
+      // Queries run in user mode, so the running user needs access to the configuration.
+      if (!Integration_Configuration__mdt.SObjectType.getDescribe().isAccessible()) {
+        throw new ConfigurationException(
+          'You do not have access to Integration_Configuration__mdt. Please ask your administrator ' +
+          'to assign you the Integration User permission set.'
+        );
+      }
       setRecords(
         [
           SELECT
