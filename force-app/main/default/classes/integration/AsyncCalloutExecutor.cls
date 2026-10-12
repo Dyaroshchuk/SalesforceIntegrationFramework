@@ -8,7 +8,9 @@
  * is passed to ICalloutQueueable.onFailure(). Scheduled retries and final failures are logged
  * as Integration logs.
  *
- * Usage: AsyncCalloutExecutor.enqueue(new SyncInvoiceCallout(invoiceId));
+ * Usage:
+ *   AsyncCalloutExecutor.forIntegration('Stripe', new SyncInvoiceCallout(invoiceId)).enqueue(0);
+ *   AsyncCalloutExecutor.enqueue(new SyncInvoiceCallout(invoiceId)); // default policy, no integration name
  */
 public inherited sharing class AsyncCalloutExecutor implements Queueable, Database.AllowsCallouts {
   @TestVisible
@@ -22,10 +24,11 @@ public inherited sharing class AsyncCalloutExecutor implements Queueable, Databa
   private final ICalloutQueueable callout;
   private final ExponentialBackoffRetry retryPolicy;
   private Integer attempts = 0;
+  private String integrationName;
 
   /** Uses the default policy: up to 3 retries after 1, 2 and 4 minutes. */
   public AsyncCalloutExecutor(ICalloutQueueable callout) {
-    this(callout, new ExponentialBackoffRetry(60000, 2, 3));
+    this(callout, ExponentialBackoffRetry.withDefaults());
   }
 
   public AsyncCalloutExecutor(
@@ -46,6 +49,25 @@ public inherited sharing class AsyncCalloutExecutor implements Queueable, Databa
     this.retryPolicy = retryPolicy;
   }
 
+  /**
+   * Executor for a configured integration: the retry policy comes from its configuration
+   * (ExponentialBackoffRetry.forIntegration) and every log carries the integration name.
+   *
+   * @throws IntegrationConfigLoader.ConfigurationException when the integration has no active,
+   *         valid configuration.
+   */
+  public static AsyncCalloutExecutor forIntegration(
+    String integrationName,
+    ICalloutQueueable callout
+  ) {
+    AsyncCalloutExecutor executor = new AsyncCalloutExecutor(
+      callout,
+      ExponentialBackoffRetry.forIntegration(integrationName)
+    );
+    executor.integrationName = integrationName;
+    return executor;
+  }
+
   /** Enqueues the callout to run as soon as possible and returns the job Id. */
   public static Id enqueue(ICalloutQueueable callout) {
     return new AsyncCalloutExecutor(callout).enqueue(0);
@@ -63,7 +85,7 @@ public inherited sharing class AsyncCalloutExecutor implements Queueable, Databa
     } catch (Exception e) {
       if (!retryLater(e)) {
         IntegrationLogger.logFailure(
-          null,
+          integrationName,
           'Async callout failed after ' + attempts + ' attempt(s)',
           e
         );
@@ -94,7 +116,7 @@ public inherited sharing class AsyncCalloutExecutor implements Queueable, Databa
     }
     Integer delayMinutes = toDelayMinutes(delayMs);
     IntegrationLogger.logWarning(
-      null,
+      integrationName,
       'Async callout attempt ' +
         attempts +
         ' failed (' +

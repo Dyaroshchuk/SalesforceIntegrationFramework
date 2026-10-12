@@ -26,9 +26,27 @@ private class LogCleanupBatchTest {
     Assert.areEqual('recent', remaining[1].Message__c);
     // Recycle Bin purging is not observable in tests (ALL ROWS still returns the row).
     Assert.isTrue(
-      [SELECT IsDeleted FROM Log__c WHERE Id = :logs[0].Id WITH SYSTEM_MODE ALL ROWS]
+      [
+        SELECT IsDeleted
+        FROM Log__c
+        WHERE Id = :logs[0].Id
+        WITH SYSTEM_MODE
+        ALL ROWS
+      ]
       .IsDeleted
     );
+  }
+
+  @IsTest
+  static void deletesBulkLogs() {
+    TestDataFactory.insertLogs(200, Datetime.now().addDays(-60));
+    TestDataFactory.insertLogs(5, null);
+
+    Test.startTest();
+    Database.executeBatch(new LogCleanupBatch(30));
+    Test.stopTest();
+
+    Assert.areEqual(5, [SELECT COUNT() FROM Log__c WITH SYSTEM_MODE]);
   }
 
   @IsTest

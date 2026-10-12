@@ -66,6 +66,37 @@ private class AsyncCalloutExecutorTest {
   }
 
   @IsTest
+  static void forIntegrationUsesConfiguredPolicyAndNamesLogs() {
+    Integration_Configuration__mdt record = TestDataFactory.integrationConfig(
+      'Billing',
+      'Billing_API'
+    );
+    record.Retry_Delay_Ms__c = 120000;
+    TestDataFactory.useIntegrationConfig(record);
+    AsyncCalloutExecutor executor = AsyncCalloutExecutor.forIntegration(
+      'Billing',
+      new FakeCallout(new CalloutException('Read timed out'))
+    );
+
+    executor.execute(null);
+    Test.getEventBus().deliver();
+
+    // Retry_Delay_Ms__c of 2 minutes is the first backoff delay.
+    Assert.areEqual(
+      new List<Integer>{ 2 },
+      AsyncCalloutExecutor.retryDelaysMinutes
+    );
+    Log__c log = [
+      SELECT Integration_Name__c, Level__c
+      FROM Log__c
+      WITH SYSTEM_MODE
+      LIMIT 1
+    ];
+    Assert.areEqual('Billing', log.Integration_Name__c);
+    Assert.areEqual('WARN', log.Level__c);
+  }
+
+  @IsTest
   static void rateLimitWaitsForLongerOfRetryAfterAndBackoff() {
     new AsyncCalloutExecutor(new FakeCallout(rateLimit(150))).execute(null);
     new AsyncCalloutExecutor(new FakeCallout(rateLimit(30))).execute(null);

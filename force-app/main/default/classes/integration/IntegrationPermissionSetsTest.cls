@@ -6,7 +6,7 @@
 private class IntegrationPermissionSetsTest {
   @IsTest
   static void standardUserCannotReadConfigurationWithoutPermissionSet() {
-    System.runAs(newStandardUser(null)) {
+    System.runAs(TestDataFactory.insertStandardUser(null)) {
       Assert.isFalse(
         Integration_Configuration__mdt.SObjectType.getDescribe().isAccessible()
       );
@@ -24,7 +24,7 @@ private class IntegrationPermissionSetsTest {
 
   @IsTest
   static void integrationUserCanReadConfigurationAndPublishLogs() {
-    System.runAs(newStandardUser('Integration_User')) {
+    System.runAs(TestDataFactory.insertStandardUser('Integration_User')) {
       Assert.isTrue(
         Integration_Configuration__mdt.SObjectType.getDescribe().isAccessible()
       );
@@ -37,7 +37,8 @@ private class IntegrationPermissionSetsTest {
         Assert.fail('Expected a ConfigurationException');
       } catch (IntegrationConfigLoader.ConfigurationException e) {
         Assert.isTrue(
-          e.getMessage().startsWith('No Integration_Configuration__mdt record found'),
+          e.getMessage()
+            .startsWith('No Integration_Configuration__mdt record found'),
           e.getMessage()
         );
       }
@@ -54,7 +55,7 @@ private class IntegrationPermissionSetsTest {
     Assert.isTrue(admin.PermissionsManageNamedCredentials);
     Assert.isTrue(admin.PermissionsCustomizeApplication);
 
-    System.runAs(newStandardUser('Integration_Admin')) {
+    System.runAs(TestDataFactory.insertStandardUser('Integration_Admin')) {
       Assert.isTrue(
         Integration_Configuration__mdt.SObjectType.getDescribe().isAccessible()
       );
@@ -64,27 +65,5 @@ private class IntegrationPermissionSetsTest {
         'Admins read every log field'
       );
     }
-  }
-
-  private static User newStandardUser(String permissionSetName) {
-    User user = new User(
-      ProfileId = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1].Id,
-      LastName = 'Integration',
-      Email = 'integration.test@example.com',
-      Username = 'integration.test.' + System.currentTimeMillis() + '@example.com',
-      Alias = 'inttest',
-      TimeZoneSidKey = 'GMT',
-      LocaleSidKey = 'en_US',
-      EmailEncodingKey = 'UTF-8',
-      LanguageLocaleKey = 'en_US'
-    );
-    insert user;
-    if (permissionSetName != null) {
-      insert new PermissionSetAssignment(
-        AssigneeId = user.Id,
-        PermissionSetId = [SELECT Id FROM PermissionSet WHERE Name = :permissionSetName].Id
-      );
-    }
-    return user;
   }
 }

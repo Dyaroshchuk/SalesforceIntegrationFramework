@@ -7,7 +7,7 @@ private class IntegrationLoggerTest {
     IntegrationLogger.logCallout(
       'Billing',
       request('{"amount":100}'),
-      response(200, 'OK', '{"id":"inv_1"}'),
+      TestDataFactory.httpResponse(200, 'OK', '{"id":"inv_1"}'),
       null,
       120,
       false
@@ -33,7 +33,7 @@ private class IntegrationLoggerTest {
     IntegrationLogger.logCallout(
       'Billing',
       request('{"amount":100}'),
-      response(201, null, '{"id":"inv_1"}'),
+      TestDataFactory.httpResponse(201, null, '{"id":"inv_1"}'),
       null,
       120,
       true
@@ -51,21 +51,62 @@ private class IntegrationLoggerTest {
     HttpRequest withQuery = request(null);
     withQuery.setEndpoint(ENDPOINT + '?email=jane%40example.com');
 
-    IntegrationLogger.logCallout('Billing', withQuery, response(200, 'OK', ''), null, 1, false);
-    IntegrationLogger.logCallout('Billing', withQuery, response(200, 'OK', ''), null, 1, true);
+    IntegrationLogger.logCallout(
+      'Billing',
+      withQuery,
+      TestDataFactory.httpResponse(200, 'OK', ''),
+      null,
+      1,
+      false
+    );
+    IntegrationLogger.logCallout(
+      'Billing',
+      withQuery,
+      TestDataFactory.httpResponse(200, 'OK', ''),
+      null,
+      1,
+      true
+    );
 
     List<Log__c> logs = deliverAndQuery();
 
     Assert.areEqual(ENDPOINT, logs[0].Endpoint__c);
-    Assert.areEqual('POST ' + ENDPOINT + ' returned 200 OK', logs[0].Message__c);
-    Assert.areEqual(ENDPOINT + '?email=jane%40example.com', logs[1].Endpoint__c);
+    Assert.areEqual(
+      'POST ' + ENDPOINT + ' returned 200 OK',
+      logs[0].Message__c
+    );
+    Assert.areEqual(
+      ENDPOINT + '?email=jane%40example.com',
+      logs[1].Endpoint__c
+    );
   }
 
   @IsTest
   static void levelFollowsOutcome() {
-    IntegrationLogger.logCallout('Billing', request(null), response(404, 'Not Found', ''), null, 1, false);
-    IntegrationLogger.logCallout('Billing', request(null), response(503, 'Service Unavailable', ''), null, 1, false);
-    IntegrationLogger.logCallout('Billing', request(null), null, new CalloutException('Read timed out'), 1, false);
+    IntegrationLogger.logCallout(
+      'Billing',
+      request(null),
+      TestDataFactory.httpResponse(404, 'Not Found', ''),
+      null,
+      1,
+      false
+    );
+    IntegrationLogger.logCallout(
+      'Billing',
+      request(null),
+      TestDataFactory.httpResponse(503, 'Service Unavailable', ''),
+      null,
+      1,
+      false
+    );
+    IntegrationLogger.logCallout(
+      'Billing',
+      request(null),
+      null,
+      new CalloutException('Read timed out'),
+      1,
+      false
+    );
 
     List<Log__c> logs = deliverAndQuery();
 
@@ -106,20 +147,6 @@ private class IntegrationLoggerTest {
       httpRequest.setBody(body);
     }
     return httpRequest;
-  }
-
-  private static HttpResponse response(
-    Integer statusCode,
-    String status,
-    String body
-  ) {
-    HttpResponse httpResponse = new HttpResponse();
-    httpResponse.setStatusCode(statusCode);
-    if (status != null) {
-      httpResponse.setStatus(status);
-    }
-    httpResponse.setBody(body);
-    return httpResponse;
   }
 
   private static List<Log__c> deliverAndQuery() {

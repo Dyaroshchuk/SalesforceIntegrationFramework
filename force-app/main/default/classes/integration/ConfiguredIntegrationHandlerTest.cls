@@ -11,7 +11,10 @@ private class ConfiguredIntegrationHandlerTest {
 
   @IsTest
   static void usesConfiguredEndpointHeadersAndRetryPolicy() {
-    Integration_Configuration__mdt record = record();
+    Integration_Configuration__mdt record = TestDataFactory.integrationConfig(
+      INTEGRATION_NAME,
+      NAMED_CREDENTIAL
+    );
     record.Base_Path__c = '/v1';
     record.Timeout_Seconds__c = 10;
     record.Max_Retries__c = 1;
@@ -19,11 +22,11 @@ private class ConfiguredIntegrationHandlerTest {
     record.Max_Callouts_Per_Transaction__c = 5;
     record.Default_Retry_After_Seconds__c = 15;
     record.Default_Headers__c = '{"X-Api-Version":"2","Accept":"application/vnd.billing+json"}';
-    setUp(record);
+    TestDataFactory.useIntegrationConfig(record);
     mocks.startStubbing();
     mocks.when(client.send(anyRequest()))
-      .thenReturn(response(409))
-      .thenReturn(response(503));
+      .thenReturn(TestDataFactory.httpResponse(409))
+      .thenReturn(TestDataFactory.httpResponse(503));
     mocks.stopStubbing();
     TestHandler handler = new TestHandler(client);
 
@@ -46,12 +49,14 @@ private class ConfiguredIntegrationHandlerTest {
 
   @IsTest
   static void fallsBackToFrameworkDefaultsForBlankFields() {
-    setUp(record());
+    TestDataFactory.useIntegrationConfig(
+      TestDataFactory.integrationConfig(INTEGRATION_NAME, NAMED_CREDENTIAL)
+    );
     mocks.startStubbing();
     mocks.when(client.send(anyRequest()))
-      .thenReturn(response(503))
-      .thenReturn(response(502))
-      .thenReturn(response(200));
+      .thenReturn(TestDataFactory.httpResponse(503))
+      .thenReturn(TestDataFactory.httpResponse(502))
+      .thenReturn(TestDataFactory.httpResponse(200));
     mocks.stopStubbing();
     TestHandler handler = new TestHandler(client);
 
@@ -71,13 +76,18 @@ private class ConfiguredIntegrationHandlerTest {
 
   @IsTest
   static void executeFailsWithoutActiveConfiguration() {
-    Integration_Configuration__mdt record = record();
+    Integration_Configuration__mdt record = TestDataFactory.integrationConfig(
+      INTEGRATION_NAME,
+      NAMED_CREDENTIAL
+    );
     record.Is_Active__c = false;
-    setUp(record);
+    TestDataFactory.useIntegrationConfig(record);
 
     try {
       new TestHandler(client)
-        .execute(new BaseIntegrationHandler.IntegrationRequest('GET', 'invoices'));
+        .execute(
+          new BaseIntegrationHandler.IntegrationRequest('GET', 'invoices')
+        );
       Assert.fail('Expected a ConfigurationException');
     } catch (IntegrationConfigLoader.ConfigurationException e) {
       Assert.areEqual('Integration Billing is not active', e.getMessage());
@@ -87,14 +97,17 @@ private class ConfiguredIntegrationHandlerTest {
 
   @IsTest
   static void logsCalloutsButNeverTokenPayloads() {
-    Integration_Configuration__mdt record = record();
+    Integration_Configuration__mdt record = TestDataFactory.integrationConfig(
+      INTEGRATION_NAME,
+      NAMED_CREDENTIAL
+    );
     record.Logging_Enabled__c = true;
     record.Log_Payloads__c = true;
-    setUp(record);
+    TestDataFactory.useIntegrationConfig(record);
     mocks.startStubbing();
     mocks.when(client.send(anyRequest()))
-      .thenReturn(response(200))
-      .thenReturn(response(201));
+      .thenReturn(TestDataFactory.httpResponse(200))
+      .thenReturn(TestDataFactory.httpResponse(201));
     mocks.stopStubbing();
 
     new TokenHandler(client)
@@ -105,14 +118,22 @@ private class ConfiguredIntegrationHandlerTest {
     Test.getEventBus().deliver();
 
     List<Log__c> logs = [
-      SELECT Category__c, Integration_Name__c, Endpoint__c, Status_Code__c, Request_Body__c
+      SELECT
+        Category__c,
+        Integration_Name__c,
+        Endpoint__c,
+        Status_Code__c,
+        Request_Body__c
       FROM Log__c
       WITH SYSTEM_MODE
       ORDER BY Name
     ];
     Assert.areEqual(2, logs.size());
     Assert.areEqual('callout:Billing_API/oauth/token', logs[0].Endpoint__c);
-    Assert.isNull(logs[0].Request_Body__c, 'Token credentials must not be logged');
+    Assert.isNull(
+      logs[0].Request_Body__c,
+      'Token credentials must not be logged'
+    );
     Assert.areEqual('callout:Billing_API/invoices', logs[1].Endpoint__c);
     Assert.areEqual('{"amount":100}', logs[1].Request_Body__c);
     Assert.areEqual(201, logs[1].Status_Code__c);
@@ -124,42 +145,28 @@ private class ConfiguredIntegrationHandlerTest {
 
   @IsTest
   static void doesNotLogWhenLoggingIsDisabled() {
-    Integration_Configuration__mdt record = record();
+    Integration_Configuration__mdt record = TestDataFactory.integrationConfig(
+      INTEGRATION_NAME,
+      NAMED_CREDENTIAL
+    );
     record.Logging_Enabled__c = false;
-    setUp(record);
+    TestDataFactory.useIntegrationConfig(record);
     mocks.startStubbing();
-    mocks.when(client.send(anyRequest())).thenReturn(response(200));
+    mocks.when(client.send(anyRequest()))
+      .thenReturn(TestDataFactory.httpResponse(200));
     mocks.stopStubbing();
 
     new TestHandler(client)
-      .execute(new BaseIntegrationHandler.IntegrationRequest('GET', 'invoices'));
+      .execute(
+        new BaseIntegrationHandler.IntegrationRequest('GET', 'invoices')
+      );
     Test.getEventBus().deliver();
 
     Assert.areEqual(0, [SELECT COUNT() FROM Log__c WITH SYSTEM_MODE]);
   }
 
-  private static Integration_Configuration__mdt record() {
-    return new Integration_Configuration__mdt(
-      DeveloperName = INTEGRATION_NAME,
-      MasterLabel = INTEGRATION_NAME,
-      Is_Active__c = true,
-      Named_Credential__c = NAMED_CREDENTIAL
-    );
-  }
-
-  private static void setUp(Integration_Configuration__mdt record) {
-    IntegrationConfigLoader.setRecords(new List<Integration_Configuration__mdt>{ record });
-    IntegrationConfigLoader.setNamedCredentialNames(new Set<String>{ NAMED_CREDENTIAL });
-  }
-
   private static HttpRequest anyRequest() {
     return (HttpRequest) fflib_Match.anyObject();
-  }
-
-  private static HttpResponse response(Integer statusCode) {
-    HttpResponse httpResponse = new HttpResponse();
-    httpResponse.setStatusCode(statusCode);
-    return httpResponse;
   }
 
   /** Verifies the client was called exactly the given number of times and returns the requests. */

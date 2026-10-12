@@ -2,11 +2,7 @@
 private class ExponentialBackoffRetryTest {
   @IsTest
   static void delaysGrowByMultiplierUpToTheCap() {
-    ExponentialBackoffRetry retry = new ExponentialBackoffRetry(
-      60000,
-      2,
-      5
-    );
+    ExponentialBackoffRetry retry = new ExponentialBackoffRetry(60000, 2, 5);
 
     Assert.areEqual(60000, retry.getDelayMs(1));
     Assert.areEqual(120000, retry.getDelayMs(2));
@@ -95,6 +91,63 @@ private class ExponentialBackoffRetryTest {
   }
 
   @IsTest
+  static void forIntegrationUsesConfiguredInitialDelay() {
+    Integration_Configuration__mdt record = TestDataFactory.integrationConfig(
+      'Billing',
+      'Billing_API'
+    );
+    record.Retry_Delay_Ms__c = 5000;
+    TestDataFactory.useIntegrationConfig(record);
+
+    ExponentialBackoffRetry retry = ExponentialBackoffRetry.forIntegration(
+      'Billing'
+    );
+
+    Assert.areEqual(5000, retry.initialDelayMs);
+    Assert.areEqual(
+      ExponentialBackoffRetry.DEFAULT_MULTIPLIER,
+      retry.multiplier
+    );
+    Assert.areEqual(
+      ExponentialBackoffRetry.DEFAULT_MAX_RETRIES,
+      retry.maxRetries
+    );
+  }
+
+  @IsTest
+  static void forIntegrationFallsBackToDefaultDelay() {
+    TestDataFactory.useIntegrationConfig(
+      TestDataFactory.integrationConfig('Billing', 'Billing_API')
+    );
+
+    ExponentialBackoffRetry retry = ExponentialBackoffRetry.forIntegration(
+      'Billing'
+    );
+    ExponentialBackoffRetry defaults = ExponentialBackoffRetry.withDefaults();
+
+    Assert.areEqual(
+      ExponentialBackoffRetry.DEFAULT_INITIAL_DELAY_MS,
+      retry.initialDelayMs
+    );
+    Assert.areEqual(defaults.initialDelayMs, retry.initialDelayMs);
+    Assert.areEqual(defaults.maxRetries, retry.maxRetries);
+  }
+
+  @IsTest
+  static void forIntegrationRequiresConfiguration() {
+    TestDataFactory.useIntegrationConfig(
+      TestDataFactory.integrationConfig('Billing', 'Billing_API')
+    );
+
+    try {
+      ExponentialBackoffRetry.forIntegration('Unknown');
+      Assert.fail('Expected a ConfigurationException');
+    } catch (IntegrationConfigLoader.ConfigurationException e) {
+      Assert.isTrue(e.getMessage().contains('Unknown'), e.getMessage());
+    }
+  }
+
+  @IsTest
   static void rejectsInvalidSettings() {
     assertInvalid(
       null,
@@ -103,13 +156,7 @@ private class ExponentialBackoffRetryTest {
       0,
       'Initial delay must be 0 or more milliseconds'
     );
-    assertInvalid(
-      -1,
-      2,
-      1,
-      0,
-      'Initial delay must be 0 or more milliseconds'
-    );
+    assertInvalid(-1, 2, 1, 0, 'Initial delay must be 0 or more milliseconds');
     assertInvalid(0, 0.5, 1, 0, 'Backoff multiplier must be at least 1');
     assertInvalid(0, null, 1, 0, 'Backoff multiplier must be at least 1');
     assertInvalid(0, 2, -1, 0, 'Max retries must be 0 or more');

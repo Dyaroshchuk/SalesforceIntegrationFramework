@@ -11,7 +11,8 @@ private class BaseIntegrationHandlerTest {
   @IsTest
   static void executeBuildsRequestAndReturnsResponse() {
     mocks.startStubbing();
-    mocks.when(client.send(anyRequest())).thenReturn(response(200, '{"id":"42"}'));
+    mocks.when(client.send(anyRequest()))
+      .thenReturn(TestDataFactory.httpResponse(200, '{"id":"42"}'));
     mocks.stopStubbing();
 
     BaseIntegrationHandler.IntegrationResponse result = new TestHandler(client)
@@ -40,7 +41,8 @@ private class BaseIntegrationHandlerTest {
   @IsTest
   static void setJsonBodySerializesPayload() {
     mocks.startStubbing();
-    mocks.when(client.send(anyRequest())).thenReturn(response(201, ''));
+    mocks.when(client.send(anyRequest()))
+      .thenReturn(TestDataFactory.httpResponse(201, ''));
     mocks.stopStubbing();
 
     new TestHandler(client)
@@ -58,9 +60,9 @@ private class BaseIntegrationHandlerTest {
   static void retriesTransientFailuresForIdempotentRequests() {
     mocks.startStubbing();
     mocks.when(client.send(anyRequest()))
-      .thenReturn(response(503, ''))
+      .thenReturn(TestDataFactory.httpResponse(503, ''))
       .thenThrow(new CalloutException('Read timed out'))
-      .thenReturn(response(200, 'ok'));
+      .thenReturn(TestDataFactory.httpResponse(200, 'ok'));
     mocks.stopStubbing();
     TestHandler handler = new TestHandler(client);
 
@@ -78,13 +80,15 @@ private class BaseIntegrationHandlerTest {
   static void returnsLastResponseWhenRetriesAreExhausted() {
     mocks.startStubbing();
     mocks.when(client.send(anyRequest()))
-      .thenReturn(response(500, ''))
-      .thenReturn(response(500, ''))
-      .thenReturn(response(500, 'still down'));
+      .thenReturn(TestDataFactory.httpResponse(500, ''))
+      .thenReturn(TestDataFactory.httpResponse(500, ''))
+      .thenReturn(TestDataFactory.httpResponse(500, 'still down'));
     mocks.stopStubbing();
 
     BaseIntegrationHandler.IntegrationResponse result = new TestHandler(client)
-      .execute(new BaseIntegrationHandler.IntegrationRequest('GET', 'accounts'));
+      .execute(
+        new BaseIntegrationHandler.IntegrationRequest('GET', 'accounts')
+      );
 
     Assert.isFalse(result.isSuccess());
     Assert.areEqual(500, result.statusCode);
@@ -103,8 +107,8 @@ private class BaseIntegrationHandlerTest {
   static void nonRetryableStatusIsNotTransient() {
     mocks.startStubbing();
     mocks.when(client.send(anyRequest()))
-      .thenReturn(response(404, ''))
-      .thenReturn(response(200, ''));
+      .thenReturn(TestDataFactory.httpResponse(404, ''))
+      .thenReturn(TestDataFactory.httpResponse(200, ''));
     mocks.stopStubbing();
     TestHandler handler = new TestHandler(client);
 
@@ -128,7 +132,9 @@ private class BaseIntegrationHandlerTest {
 
     try {
       new TestHandler(client)
-        .execute(new BaseIntegrationHandler.IntegrationRequest('GET', 'accounts'));
+        .execute(
+          new BaseIntegrationHandler.IntegrationRequest('GET', 'accounts')
+        );
       Assert.fail('Expected IntegrationException');
     } catch (BaseIntegrationHandler.IntegrationException e) {
       Assert.isInstanceOfType(e.getCause(), CalloutException.class);
@@ -140,12 +146,14 @@ private class BaseIntegrationHandlerTest {
   static void doesNotRetryNonIdempotentRequestsByDefault() {
     mocks.startStubbing();
     mocks.when(client.send(anyRequest()))
-      .thenReturn(response(503, ''))
-      .thenReturn(response(200, ''));
+      .thenReturn(TestDataFactory.httpResponse(503, ''))
+      .thenReturn(TestDataFactory.httpResponse(200, ''));
     mocks.stopStubbing();
 
     BaseIntegrationHandler.IntegrationResponse result = new TestHandler(client)
-      .execute(new BaseIntegrationHandler.IntegrationRequest('POST', 'accounts'));
+      .execute(
+        new BaseIntegrationHandler.IntegrationRequest('POST', 'accounts')
+      );
 
     Assert.areEqual(503, result.statusCode);
     // Not repeated now, so not repeated later either.
@@ -157,8 +165,8 @@ private class BaseIntegrationHandlerTest {
   static void retriesNonIdempotentRequestsMarkedRetryable() {
     mocks.startStubbing();
     mocks.when(client.send(anyRequest()))
-      .thenReturn(response(503, ''))
-      .thenReturn(response(200, ''));
+      .thenReturn(TestDataFactory.httpResponse(503, ''))
+      .thenReturn(TestDataFactory.httpResponse(200, ''));
     mocks.stopStubbing();
 
     BaseIntegrationHandler.IntegrationResponse result = new TestHandler(client)
@@ -175,8 +183,8 @@ private class BaseIntegrationHandlerTest {
   static void doesNotRetryWhenMaxRetriesIsZero() {
     mocks.startStubbing();
     mocks.when(client.send(anyRequest()))
-      .thenReturn(response(503, ''))
-      .thenReturn(response(200, ''));
+      .thenReturn(TestDataFactory.httpResponse(503, ''))
+      .thenReturn(TestDataFactory.httpResponse(200, ''));
     mocks.stopStubbing();
     TestHandler handler = new TestHandler(client);
     handler.maxRetries = 0;
@@ -192,7 +200,8 @@ private class BaseIntegrationHandlerTest {
   @IsTest
   static void appliesAndCachesAccessToken() {
     mocks.startStubbing();
-    mocks.when(client.send(anyRequest())).thenReturn(response(200, ''));
+    mocks.when(client.send(anyRequest()))
+      .thenReturn(TestDataFactory.httpResponse(200, ''));
     mocks.stopStubbing();
     TestHandler handler = new TestHandler(client);
     handler.useToken = true;
@@ -211,7 +220,8 @@ private class BaseIntegrationHandlerTest {
   @IsTest
   static void refreshesExpiredAccessToken() {
     mocks.startStubbing();
-    mocks.when(client.send(anyRequest())).thenReturn(response(200, ''));
+    mocks.when(client.send(anyRequest()))
+      .thenReturn(TestDataFactory.httpResponse(200, ''));
     mocks.stopStubbing();
     TestHandler handler = new TestHandler(client);
     handler.useToken = true;
@@ -231,8 +241,8 @@ private class BaseIntegrationHandlerTest {
   static void refreshesTokenOnceOnUnauthorized() {
     mocks.startStubbing();
     mocks.when(client.send(anyRequest()))
-      .thenReturn(response(401, ''))
-      .thenReturn(response(200, 'ok'));
+      .thenReturn(TestDataFactory.httpResponse(401, ''))
+      .thenReturn(TestDataFactory.httpResponse(200, 'ok'));
     mocks.stopStubbing();
     TestHandler handler = new TestHandler(client);
     handler.useToken = true;
@@ -252,7 +262,8 @@ private class BaseIntegrationHandlerTest {
   @IsTest
   static void returnsUnauthorizedWhenRefreshDoesNotHelp() {
     mocks.startStubbing();
-    mocks.when(client.send(anyRequest())).thenReturn(response(401, 'denied'));
+    mocks.when(client.send(anyRequest()))
+      .thenReturn(TestDataFactory.httpResponse(401, 'denied'));
     mocks.stopStubbing();
     TestHandler handler = new TestHandler(client);
     handler.useToken = true;
@@ -268,11 +279,14 @@ private class BaseIntegrationHandlerTest {
   @IsTest
   static void doesNotRetryUnauthorizedWithoutToken() {
     mocks.startStubbing();
-    mocks.when(client.send(anyRequest())).thenReturn(response(401, ''));
+    mocks.when(client.send(anyRequest()))
+      .thenReturn(TestDataFactory.httpResponse(401, ''));
     mocks.stopStubbing();
 
     BaseIntegrationHandler.IntegrationResponse result = new TestHandler(client)
-      .execute(new BaseIntegrationHandler.IntegrationRequest('GET', 'accounts'));
+      .execute(
+        new BaseIntegrationHandler.IntegrationRequest('GET', 'accounts')
+      );
 
     Assert.areEqual(401, result.statusCode);
     sentRequests(1);
@@ -297,12 +311,12 @@ private class BaseIntegrationHandlerTest {
 
   @IsTest
   static void rateLimitedResponseThrowsAndBlocksFurtherCallouts() {
-    HttpResponse tooManyRequests = response(429, '');
+    HttpResponse tooManyRequests = TestDataFactory.httpResponse(429, '');
     tooManyRequests.setHeader('Retry-After', '120');
     mocks.startStubbing();
     mocks.when(client.send(anyRequest()))
       .thenReturn(tooManyRequests)
-      .thenReturn(response(200, ''));
+      .thenReturn(TestDataFactory.httpResponse(200, ''));
     mocks.stopStubbing();
     TestHandler handler = new TestHandler(client);
 
@@ -329,12 +343,15 @@ private class BaseIntegrationHandlerTest {
   @IsTest
   static void rateLimitWithoutRetryAfterUsesDefault() {
     mocks.startStubbing();
-    mocks.when(client.send(anyRequest())).thenReturn(response(429, ''));
+    mocks.when(client.send(anyRequest()))
+      .thenReturn(TestDataFactory.httpResponse(429, ''));
     mocks.stopStubbing();
 
     try {
       new TestHandler(client)
-        .execute(new BaseIntegrationHandler.IntegrationRequest('GET', 'accounts'));
+        .execute(
+          new BaseIntegrationHandler.IntegrationRequest('GET', 'accounts')
+        );
       Assert.fail('Expected RateLimitException');
     } catch (BaseIntegrationHandler.RateLimitException e) {
       Assert.areEqual(60, e.retryAfterSeconds);
@@ -344,14 +361,17 @@ private class BaseIntegrationHandlerTest {
   @IsTest
   static void enforcesCalloutsPerTransactionCap() {
     mocks.startStubbing();
-    mocks.when(client.send(anyRequest())).thenReturn(response(200, ''));
+    mocks.when(client.send(anyRequest()))
+      .thenReturn(TestDataFactory.httpResponse(200, ''));
     mocks.stopStubbing();
     TestHandler handler = new TestHandler(client);
     handler.maxCalloutsPerTransaction = 1;
 
     handler.execute(new BaseIntegrationHandler.IntegrationRequest('GET', 'a'));
     try {
-      handler.execute(new BaseIntegrationHandler.IntegrationRequest('GET', 'b'));
+      handler.execute(
+        new BaseIntegrationHandler.IntegrationRequest('GET', 'b')
+      );
       Assert.fail('Expected CalloutLimitException');
     } catch (BaseIntegrationHandler.CalloutLimitException e) {
       sentRequests(1);
@@ -374,23 +394,21 @@ private class BaseIntegrationHandlerTest {
    */
   @IsTest
   static void sendsThroughHttpByDefault() {
-    Test.setMock(HttpCalloutMock.class, new FixedCalloutMock(response(200, 'ok')));
+    Test.setMock(
+      HttpCalloutMock.class,
+      new FixedCalloutMock(TestDataFactory.httpResponse(200, 'ok'))
+    );
 
     BaseIntegrationHandler.IntegrationResponse result = new TestHandler()
-      .execute(new BaseIntegrationHandler.IntegrationRequest('GET', 'accounts'));
+      .execute(
+        new BaseIntegrationHandler.IntegrationRequest('GET', 'accounts')
+      );
 
     Assert.areEqual('ok', result.body);
   }
 
   private static HttpRequest anyRequest() {
     return (HttpRequest) fflib_Match.anyObject();
-  }
-
-  private static HttpResponse response(Integer statusCode, String body) {
-    HttpResponse httpResponse = new HttpResponse();
-    httpResponse.setStatusCode(statusCode);
-    httpResponse.setBody(body);
-    return httpResponse;
   }
 
   /** Verifies the client was called exactly the given number of times and returns the requests. */

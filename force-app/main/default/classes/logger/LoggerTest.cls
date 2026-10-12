@@ -49,7 +49,10 @@ private class LoggerTest {
       logs[0].Exception_Type__c
     );
     Assert.isTrue(
-      logs[0].Stack_Trace__c.contains('Caused by: System.CalloutException: Read timed out'),
+      logs[0]
+        .Stack_Trace__c.contains(
+          'Caused by: System.CalloutException: Read timed out'
+        ),
       logs[0].Stack_Trace__c
     );
   }
@@ -110,18 +113,7 @@ private class LoggerTest {
 
   @IsTest
   static void storesEntriesForStandardUsers() {
-    User standardUser = new User(
-      ProfileId = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1].Id,
-      LastName = 'Logger',
-      Email = 'logger.test@example.com',
-      Username = 'logger.test.' + System.currentTimeMillis() + '@example.com',
-      Alias = 'logtest',
-      TimeZoneSidKey = 'GMT',
-      LocaleSidKey = 'en_US',
-      EmailEncodingKey = 'UTF-8',
-      LanguageLocaleKey = 'en_US'
-    );
-    insert standardUser;
+    User standardUser = TestDataFactory.insertStandardUser(null);
 
     System.runAs(standardUser) {
       Logger.error('Logged without log permissions');
@@ -130,6 +122,39 @@ private class LoggerTest {
     List<Log__c> logs = deliverAndQuery();
     Assert.areEqual(1, logs.size());
     Assert.areEqual(standardUser.Id, logs[0].Author__c);
+  }
+
+  @IsTest
+  static void storesBulkEvents() {
+    List<Log_Event__e> events = new List<Log_Event__e>();
+    for (Integer i = 0; i < 200; i++) {
+      events.add(
+        new Log_Event__e(
+          Category__c = 'Integration',
+          Level__c = 'INFO',
+          Message__c = 'Event ' + i,
+          Author_Id__c = UserInfo.getUserId()
+        )
+      );
+    }
+
+    Test.startTest();
+    LogEventTriggerHandler.persist(events);
+    Integer queries = Limits.getQueries();
+    Integer dmlStatements = Limits.getDmlStatements();
+    Test.stopTest();
+
+    Assert.areEqual(
+      200,
+      [
+        SELECT COUNT()
+        FROM Log__c
+        WHERE Category__c = 'Integration'
+        WITH SYSTEM_MODE
+      ]
+    );
+    Assert.areEqual(0, queries, 'No queries per event');
+    Assert.areEqual(1, dmlStatements, 'One insert for the whole batch');
   }
 
   @IsTest

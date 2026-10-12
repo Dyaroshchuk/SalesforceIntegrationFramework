@@ -12,6 +12,40 @@
 public virtual inherited sharing class ExponentialBackoffRetry {
   /** Longest delay a Queueable can be enqueued with. */
   public static final Integer MAX_QUEUEABLE_DELAY_MS = 600000;
+  @TestVisible
+  private static final Integer DEFAULT_INITIAL_DELAY_MS = 60000;
+  @TestVisible
+  private static final Decimal DEFAULT_MULTIPLIER = 2;
+  @TestVisible
+  private static final Integer DEFAULT_MAX_RETRIES = 3;
+
+  /** Up to 3 retries after 1, 2 and 4 minutes. */
+  public static ExponentialBackoffRetry withDefaults() {
+    return new ExponentialBackoffRetry(
+      DEFAULT_INITIAL_DELAY_MS,
+      DEFAULT_MULTIPLIER,
+      DEFAULT_MAX_RETRIES
+    );
+  }
+
+  /**
+   * Policy for a configured integration: Retry_Delay_Ms__c is the initial delay (1 minute when
+   * blank), with the default multiplier and retry count. Max_Retries__c is not used here; it
+   * limits the immediate in-transaction retries.
+   *
+   * @throws IntegrationConfigLoader.ConfigurationException when the integration has no active,
+   *         valid configuration.
+   */
+  public static ExponentialBackoffRetry forIntegration(String integrationName) {
+    IntegrationConfigLoader.IntegrationConfig config = IntegrationConfigLoader.load(
+      integrationName
+    );
+    return new ExponentialBackoffRetry(
+      config.retryDelayMs ?? DEFAULT_INITIAL_DELAY_MS,
+      DEFAULT_MULTIPLIER,
+      DEFAULT_MAX_RETRIES
+    );
+  }
 
   public Integer initialDelayMs { get; private set; }
   public Decimal multiplier { get; private set; }
@@ -81,7 +115,8 @@ public virtual inherited sharing class ExponentialBackoffRetry {
     for (Integer i = 1; i < retryNumber && delayMs < maxDelayMs; i++) {
       delayMs *= multiplier;
     }
-    return Math.min(delayMs, maxDelayMs).round(System.RoundingMode.CEILING)
+    return Math.min(delayMs, maxDelayMs)
+      .round(System.RoundingMode.CEILING)
       .intValue();
   }
 
